@@ -114,16 +114,3 @@ python src/agent/adk_agent.py
 uvicorn src.dashboard.app:app --reload
 ```
 
-## Hackathon compliance notes
-
-- Uses `google-cloud-aiplatform` (ADK) and `google-genai` for all AI/agent
-  logic — no non-Google AI vendor is called anywhere in this repo.
-- Uses the official `mcp-clickhouse` MCP server, connected to a live
-  ClickHouse cluster, called at runtime by the ADK agent (not just referenced
-  in this README) — see `src/agent/adk_agent.py`.
-- Licensed under MIT (see `LICENSE`) — open source, as required.
-
-## Status
-
-Early scaffold — see `docs/BUILD_PLAN.md` for the week-by-week plan this repo
-is being built against.
