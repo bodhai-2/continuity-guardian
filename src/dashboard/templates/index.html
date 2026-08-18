@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Continuity Guardian</title>
+<style>
+  :root {
+    --bg: #0b0d0f;
+    --panel: #14171a;
+    --panel-line: #24282c;
+    --leader: #f4a623;      /* film-leader amber -- the one accent we spend boldness on */
+    --ok: #3fbac2;
+    --high: #e25c4b;
+    --medium: #d9a441;
+    --low: #6b7680;
+    --text: #e8e6e1;
+    --text-dim: #8b9096;
+    --mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+    --display: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* --- Header: slate/clapperboard signature --- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 28px;
+    border-bottom: 3px solid var(--leader);
+    background: repeating-linear-gradient(
+      -45deg, #16181b, #16181b 14px, #101214 14px, #101214 28px
+    );
+  }
+  #access-key-box {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #access-key-box label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  #access-key-box input {
+    width: 140px;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 2px;
+  }
+  .slate-mark {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.06em;
+    color: var(--leader);
+    border: 2px solid var(--leader);
+    padding: 4px 10px;
+    transform: skewX(-8deg);
+    white-space: nowrap;
+  }
+  header h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  header p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .team-byline {
+    color: var(--leader) !important;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-top: 2px !important;
+  }
+
+  main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 820px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 2px;
+  }
+  section.panel > .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--panel-line);
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  section.panel > .panel-body { padding: 16px; }
+
+  /* --- Upload panel --- */
+  label { display: block; font-size: 11px; color: var(--text-dim); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  input[type=text], input[type=number] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    color: var(--text);
+    font-family: var(--mono);
+    padding: 8px 10px;
+    border-radius: 2px;
+  }
+  input[type=file] { width: 100%; font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  button {
+    margin-top: 14px;
+    background: var(--leader);
+    color: #14120a;
+    border: none;
+    font-family: var(--display);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+    padding: 10px 16px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: wait; }
+  button.secondary {
+    background: transparent;
+    color: var(--ok);
+    border: 1px solid var(--ok);
+  }
+  #upload-status { margin-top: 10px; font-size: 12px; color: var(--text-dim); white-space: pre-wrap; }
+
+  /* --- Flags panel --- */
+  .scene-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .scene-row input { flex: 1; }
+  .flag {
+    border-left: 3px solid var(--low);
+    background: var(--bg);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 0 2px 2px 0;
+  }
+  .flag.high { border-left-color: var(--high); }
+  .flag.medium { border-left-color: var(--medium); }
+  .flag.low { border-left-color: var(--low); }
+  .flag .meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .flag .meta .sev-high { color: var(--high); }
+  .flag .meta .sev-medium { color: var(--medium); }
+  .flag .meta .sev-low { color: var(--low); }
+  .flag .text { font-size: 13px; }
+  .empty-state { color: var(--text-dim); font-size: 12px; padding: 8px 0; }
+
+  #thumb-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    margin-bottom: 14px;
+  }
+  .thumb-card {
+    flex: 0 0 auto;
+    text-align: center;
+  }
+  .thumb-card img {
+    width: 120px;
+    height: 68px;
+    object-fit: cover;
+    border: 1px solid var(--panel-line);
+    border-radius: 2px;
+    display: block;
+  }
+  .thumb-card .thumb-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+  }
+
+  .flag.resolved { opacity: 0.45; }
+  .flag .resolve-btn {
+    margin-top: 6px;
+    background: transparent;
+    border: 1px solid var(--ok);
+    color: var(--ok);
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .flag .resolve-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* --- Chat panel (spans full width) --- */
+  #chat-panel { grid-column: 1 / -1; }
+  #chat-log {
+    height: 260px;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 2px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .msg { margin-bottom: 12px; }
+  .msg .who {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+  }
+  .msg.user .who { color: var(--ok); }
+  .msg.agent .who { color: var(--leader); }
+  .msg .body { white-space: pre-wrap; font-size: 13px; }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input-row input { flex: 1; }
+  .chat-input-row button { margin-top: 0; }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 24px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="slate-mark">SC · TK</div>
+  <div>
+    <h1>Continuity Guardian</h1>
+    <p>AI script supervisor — cross-take continuity, grounded in ClickHouse</p>
+    <p class="team-byline">by Team Vidyut</p>
+  </div>
+  <div id="access-key-box">
+    <label for="access-key" style="margin:0;">Access Key</label>
+    <input type="text" id="access-key" placeholder="if required">
+  </div>
+</header>
+
+<main>
+
+  <section class="panel" id="upload-panel">
+    <div class="panel-head"><span>Log a Take</span></div>
+    <div class="panel-body">
+      <label for="scene-id">Scene ID</label>
+      <input type="text" id="scene-id" placeholder="e.g. SC01">
+
+      <label for="take-number">Take Number</label>
+      <input type="number" id="take-number" min="1" placeholder="e.g. 1">
+
+      <label for="video-file">Take footage (.mp4)</label>
+      <input type="file" id="video-file" accept="video/mp4">
+
+      <button id="upload-btn" onclick="uploadTake()">Analyze Take</button>
+      <div id="upload-status"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="flags-panel">
+    <div class="panel-head"><span>Continuity Flags</span></div>
+    <div class="panel-body">
+      <div class="scene-row">
+        <input type="text" id="flags-scene-id" placeholder="Scene ID, e.g. SC01">
+        <button class="secondary" onclick="loadFlags()">Load</button>
+      </div>
+      <div id="thumb-strip"></div>
+      <div id="flags-list" class="empty-state">Enter a scene ID and load its flags.</div>
+    </div>
+  </section>
+
+  <section class="panel" id="chat-panel">
+    <div class="panel-head"><span>Ask Continuity Guardian</span></div>
+    <div class="panel-body">
+      <div id="chat-log"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="e.g. what continuity issues are flagged for SC01?"
+               onkeydown="if(event.key==='Enter') sendChat();">
+        <button onclick="sendChat()">Ask</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>Team Vidyut — built for the Google Cloud Agentic Cinema Hackathon — ClickHouse track</footer>
+
+<script>
+// Access key persists across page reloads via localStorage so you don't
+// have to retype it every time -- fine for a low-stakes shared secret.
+const keyInput = document.getElementById('access-key');
+keyInput.value = localStorage.getItem('cg_access_key') || '';
+keyInput.addEventListener('change', () => localStorage.setItem('cg_access_key', keyInput.value));
+
+function authHeaders(extra = {}) {
+  const key = keyInput.value.trim();
+  return key ? { ...extra, 'X-Access-Key': key } : extra;
+}
+
+async function uploadTake() {
+  const sceneId = document.getElementById('scene-id').value.trim();
+  const takeNumber = document.getElementById('take-number').value.trim();
+  const fileInput = document.getElementById('video-file');
+  const statusEl = document.getElementById('upload-status');
+  const btn = document.getElementById('upload-btn');
+
+  if (!sceneId || !takeNumber || !fileInput.files.length) {
+    statusEl.textContent = 'Scene ID, take number, and a video file are all required.';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  btn.disabled = true;
+  statusEl.textContent = 'Analyzing take with Gemini, then loading into ClickHouse... this can take 15-30s.';
+
+  try {
+    const url = `/upload?scene_id=${encodeURIComponent(sceneId)}&take_number=${encodeURIComponent(takeNumber)}`;
+    const res = await fetch(url, { method: 'POST', headers: authHeaders(), body: formData });
+    if (res.status === 401) throw new Error('Access key required or incorrect (see top right).');
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    statusEl.textContent =
+      `Done. Shot summary: "${data.shot_summary}"\n` +
+      `New continuity flags generated: ${data.new_continuity_flags}`;
+  } catch (err) {
+    statusEl.textContent = `Upload failed: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadThumbnails(sceneId) {
+  const stripEl = document.getElementById('thumb-strip');
+  stripEl.innerHTML = '';
+  try {
+    const res = await fetch(`/shots/${encodeURIComponent(sceneId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    stripEl.innerHTML = (data.shots || [])
+      .filter(s => s.thumbnail_b64)
+      .map(s => `
+        <div class="thumb-card">
+          <img src="data:image/jpeg;base64,${s.thumbnail_b64}" alt="Take ${s.take_number}">
+          <div class="thumb-label">Take ${s.take_number}</div>
+        </div>
+      `).join('');
+  } catch (err) {
+    // Thumbnails are a nice-to-have -- fail silently rather than blocking the flags view.
+  }
+}
+
+async function loadFlags() {
+  const sceneId = document.getElementById('flags-scene-id').value.trim();
+  const listEl = document.getElementById('flags-list');
+  if (!sceneId) return;
+
+  listEl.className = 'empty-state';
+  listEl.textContent = 'Loading...';
+  loadThumbnails(sceneId);
+
+  try {
+    const res = await fetch(`/flags/${encodeURIComponent(sceneId)}`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+
+    if (!data.flags || data.flags.length === 0) {
+      listEl.className = 'empty-state';
+      listEl.textContent = `No continuity flags recorded for ${sceneId} yet.`;
+      return;
+    }
+
+    listEl.className = '';
+    listEl.innerHTML = data.flags.map(f => `
+      <div class="flag ${f.severity} ${f.resolved ? 'resolved' : ''}" id="flag-${f.flag_id}">
+        <div class="meta">
+          <span class="sev-${f.severity}">${f.severity}</span>
+          &middot; Take ${f.take_a} vs Take ${f.take_b}
+          &middot; ${f.entity_label}
+        </div>
+        <div class="text">${f.flag_text}</div>
+        <button class="resolve-btn" ${f.resolved ? 'disabled' : ''}
+                onclick="resolveFlag('${f.flag_id}')">
+          ${f.resolved ? 'Resolved' : 'Mark Resolved'}
+        </button>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.className = 'empty-state';
+    listEl.textContent = `Failed to load flags: ${err.message}`;
+  }
+}
+
+async function resolveFlag(flagId) {
+  const flagEl = document.getElementById(`flag-${flagId}`);
+  const btn = flagEl.querySelector('.resolve-btn');
+  btn.disabled = true;
+  btn.textContent = 'Resolving...';
+  try {
+    const res = await fetch(`/flags/${flagId}/resolve`, { method: 'POST' });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    flagEl.classList.add('resolved');
+    btn.textContent = 'Resolved';
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Mark Resolved (retry)';
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const log = document.getElementById('chat-log');
+  const message = input.value.trim();
+  if (!message) return;
+
+  log.innerHTML += `<div class="msg user"><div class="who">You</div><div class="body">${message}</div></div>`;
+  input.value = '';
+  log.scrollTop = log.scrollHeight;
+
+  const pendingId = 'pending-' + Date.now();
+  log.innerHTML += `<div class="msg agent" id="${pendingId}"><div class="who">Continuity Guardian</div><div class="body">Querying ClickHouse...</div></div>`;
+  log.scrollTop = log.scrollHeight;
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ message })
+    });
+    if (res.status === 401) throw new Error('Access key required or incorrect (see top right).');
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    document.querySelector(`#${pendingId} .body`).textContent = data.reply || '(no reply)';
+  } catch (err) {
+    document.querySelector(`#${pendingId} .body`).textContent = `Error: ${err.message}`;
+  }
+  log.scrollTop = log.scrollHeight;
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Google Cloud / Gemini / ADK
+google-cloud-aiplatform[agent_engines,adk]>=1.101.0
+google-genai>=0.3.0
+
+# ClickHouse
+clickhouse-connect>=0.7.0
+mcp-clickhouse>=0.1.0
+
+# MCP client (used by the ADK agent to talk to mcp-clickhouse)
+mcp>=1.2.0
+
+# Dashboard
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# Video / general utilities
+opencv-python-headless>=4.9.0
+python-dotenv>=1.0.1
+pydantic>=2.7.0
+
+# Dev / test
+pytest>=8.2.0
+httpx>=0.27.0
