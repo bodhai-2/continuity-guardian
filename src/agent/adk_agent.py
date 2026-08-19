@@ -19,8 +19,10 @@ import os
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.runners import InMemoryRunner
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from google.genai import types
+from mcp import StdioServerParameters
 
 load_dotenv()
 
@@ -39,6 +41,11 @@ When asked about continuity issues, props, costumes, or takes:
    (e.g. "Take 2 vs Take 4 of SC01").
 4. If the database has no relevant data, say so plainly rather than
    speculating about what a real set might look like.
+5. If your ClickHouse tools are unavailable or fail to connect, say so
+   explicitly (e.g. "I couldn't reach the database just now") — never
+   write out a SQL query as your answer instead of actually running it,
+   and never guess at table or column names. An honest "I couldn't check"
+   is always better than a confident-sounding fabricated answer.
 """
 
 
@@ -48,19 +55,30 @@ def build_clickhouse_mcp_toolset() -> MCPToolset:
     subprocess over stdio and exposes its tools (query, list tables, etc.)
     to the ADK agent. Credentials are passed via environment variables,
     matching mcp-clickhouse's own configuration contract.
+
+    Uses StdioConnectionParams (not the older StdioServerParameters
+    directly) specifically for its `timeout` option -- ADK's default is a
+    hardcoded 5 seconds, which is nowhere near enough when the ClickHouse
+    Cloud free-tier instance is idle and needs to wake up first, or the
+    host container itself just cold-started (e.g. Render's free tier).
+    60s gives real headroom for both without masking a genuinely broken
+    connection forever.
     """
     return MCPToolset(
-        connection_params=StdioServerParameters(
-            command="mcp-clickhouse",
-            args=[],
-            env={
-                "CLICKHOUSE_HOST": os.environ["CLICKHOUSE_HOST"],
-                "CLICKHOUSE_PORT": os.environ.get("CLICKHOUSE_PORT", "8443"),
-                "CLICKHOUSE_USER": os.environ.get("CLICKHOUSE_USER", "default"),
-                "CLICKHOUSE_PASSWORD": os.environ.get("CLICKHOUSE_PASSWORD", ""),
-                "CLICKHOUSE_DATABASE": os.environ.get("CLICKHOUSE_DATABASE", "continuity_guardian"),
-                "CLICKHOUSE_SECURE": os.environ.get("CLICKHOUSE_SECURE", "true"),
-            },
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="mcp-clickhouse",
+                args=[],
+                env={
+                    "CLICKHOUSE_HOST": os.environ["CLICKHOUSE_HOST"],
+                    "CLICKHOUSE_PORT": os.environ.get("CLICKHOUSE_PORT", "8443"),
+                    "CLICKHOUSE_USER": os.environ.get("CLICKHOUSE_USER", "default"),
+                    "CLICKHOUSE_PASSWORD": os.environ.get("CLICKHOUSE_PASSWORD", ""),
+                    "CLICKHOUSE_DATABASE": os.environ.get("CLICKHOUSE_DATABASE", "continuity_guardian"),
+                    "CLICKHOUSE_SECURE": os.environ.get("CLICKHOUSE_SECURE", "true"),
+                },
+            ),
+            timeout=60,
         ),
     )
 
