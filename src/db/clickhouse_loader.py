@@ -219,8 +219,17 @@ def diff_takes_for_scene(client, scene_id: str) -> int:
         match["entries"].append((take_number, label, position, state))
 
     new_flags = []
+
+    # All take numbers that actually have data for this scene -- needed to
+    # detect a "gap" (an object present before AND after a take where it
+    # simply wasn't detected at all).
+    all_takes = sorted({r[0] for r in rows})
+
     for entity in entities:
         entries = sorted(entity["entries"], key=lambda e: e[0])
+
+        # 1. Position/state changes between the object's consecutive
+        #    *appearances* (existing behavior).
         for i in range(len(entries) - 1):
             take_a, label_a, pos_a, state_a = entries[i]
             take_b, label_b, pos_b, state_b = entries[i + 1]
@@ -230,6 +239,26 @@ def diff_takes_for_scene(client, scene_id: str) -> int:
                     f"({pos_a}, {state_a}) and take {take_b} ({pos_b}, {state_b})"
                 )
                 new_flags.append([scene_id, take_a, take_b, label_b, flag_text, "high"])
+
+        # 2. Gaps: the object appears, is completely absent from an
+        #    intermediate take, then reappears -- flagged even if its
+        #    position/state matches before and after, since disappearing
+        #    for an entire take is itself the continuity error.
+        entity_takes = {e[0] for e in entries}
+        for i in range(len(entries) - 1):
+            take_a, label_a, _, _ = entries[i]
+            take_b, label_b, _, _ = entries[i + 1]
+            missing_takes = [
+                t for t in all_takes
+                if take_a < t < take_b and t not in entity_takes
+            ]
+            for missing_take in missing_takes:
+                flag_text = (
+                    f"'{label_a}' is present in take {take_a} and take {take_b}, "
+                    f"but was not detected at all in take {missing_take} -- "
+                    f"check whether it genuinely left frame or was missed"
+                )
+                new_flags.append([scene_id, take_a, missing_take, label_a, flag_text, "high"])
 
     if new_flags:
         client.insert(
