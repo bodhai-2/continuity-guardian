@@ -35,7 +35,36 @@ load_dotenv()
 MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 CONTINUITY_ANALYSIS_PROMPT = """You are an expert film script supervisor
-analyzing a single take for continuity purposes.
+analyzing a single take for continuity purposes. A script supervisor does
+NOT flag everything that differs between takes -- only things a viewer
+would notice as inconsistent. Apply these three rules when describing
+what you see:
+
+1. DESCRIBE THE FINAL STATE, NOT A MID-ACTION SNAPSHOT. If an object or
+   actor visibly moves or changes DURING this take (e.g. the actor picks
+   up a mug and moves it from the table to their hand), report its state
+   and position as of the END of the take, right before the cut -- not
+   partway through the motion. An on-screen, visible change within a
+   single take is normal continuous action, not a continuity risk; only
+   an unexplained difference BETWEEN takes is.
+
+2. DESCRIBE POSITION RELATIVE TO THE BODY OR A FIXED LANDMARK, NOT RAW
+   SCREEN DIRECTION, whenever possible. Prefer "in the actor's right
+   hand" or "on the left side of the desk, next to the lamp" over "screen
+   left" or "frame right" -- camera angle changes between takes shift
+   what appears on which side of the FRAME even when nothing in the real
+   world moved, and body/landmark-relative descriptions stay valid across
+   different camera setups. Only fall back to pure screen-direction
+   language if no body or landmark reference is available.
+
+3. ONLY TRACK CONTINUITY-RELEVANT OBJECTS: deliberate props, costume
+   items, and set dressing a script supervisor would actually need to
+   match between takes. Do NOT include naturally dynamic environmental
+   elements that vary on their own regardless of continuity -- wind-blown
+   leaves or hair, water ripples, fabric flutter, background ambient
+   motion, shifting shadows from moving light sources. These are expected
+   physical variation, not continuity errors, and should be left out of
+   detected_objects entirely.
 
 Watch the provided clip and return STRICT JSON (no markdown, no commentary)
 matching this shape:
@@ -45,15 +74,15 @@ matching this shape:
   "detected_objects": [
     {
       "label": "e.g. coffee mug",
-      "screen_position": "e.g. left hand, held at chest height",
-      "state": "e.g. half full, handle facing camera"
+      "screen_position": "e.g. in the actor's left hand, held at chest height (body/landmark-relative, final state of the take)",
+      "state": "e.g. half full, handle facing camera (final state of the take)"
     }
   ],
   "actor_notes": [
     {
       "actor_description": "e.g. actor in blue jacket",
-      "costume_state": "e.g. jacket zipped, collar up",
-      "pose_or_gesture": "e.g. right hand in pocket"
+      "costume_state": "e.g. jacket zipped, collar up (final state of the take)",
+      "pose_or_gesture": "e.g. right hand in pocket (final state of the take)"
     }
   ],
   "camera_notes": {
