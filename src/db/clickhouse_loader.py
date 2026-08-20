@@ -229,16 +229,27 @@ def diff_takes_for_scene(client, scene_id: str) -> int:
         entries = sorted(entity["entries"], key=lambda e: e[0])
 
         # 1. Position/state changes between the object's consecutive
-        #    *appearances* (existing behavior).
+        #    *appearances*. Severity is differentiated, not hardcoded:
+        #    a STATE change (e.g. zipped -> unzipped, full -> empty) is a
+        #    more concrete, verifiable continuity break than a POSITION-only
+        #    difference, which can sometimes just be an artifact of
+        #    Gemini's phrasing rather than something an actor actually
+        #    changed. Both differing at once is the clearest case, so it
+        #    stays high; state-only is high (a costume/prop condition
+        #    changed); position-only alone is medium (worth a look, less
+        #    certain to be a real error).
         for i in range(len(entries) - 1):
             take_a, label_a, pos_a, state_a = entries[i]
             take_b, label_b, pos_b, state_b = entries[i + 1]
-            if pos_a.lower() != pos_b.lower() or state_a.lower() != state_b.lower():
+            pos_changed = pos_a.lower() != pos_b.lower()
+            state_changed = state_a.lower() != state_b.lower()
+            if pos_changed or state_changed:
+                severity = "high" if state_changed else "medium"
                 flag_text = (
                     f"'{label_a}' differs between take {take_a} "
                     f"({pos_a}, {state_a}) and take {take_b} ({pos_b}, {state_b})"
                 )
-                new_flags.append([scene_id, take_a, take_b, label_b, flag_text, "high"])
+                new_flags.append([scene_id, take_a, take_b, label_b, flag_text, severity])
 
         # 2. Gaps: the object appears, is completely absent from an
         #    intermediate take, then reappears -- flagged even if its
