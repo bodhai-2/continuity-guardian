@@ -179,22 +179,53 @@ def _soft_token_overlap(tokens_a: set[str], tokens_b: set[str], threshold: float
     return matched / denom if denom else 0.0
 
 
+COLOR_WORDS = {
+    "red", "orange", "yellow", "green", "blue", "purple", "violet", "pink",
+    "black", "white", "gray", "grey", "brown", "silver", "gold", "golden",
+    "lime", "navy", "teal", "cyan", "magenta", "maroon", "beige", "tan",
+    "olive", "turquoise", "indigo", "charcoal", "cream", "ivory", "bronze",
+    "copper", "burgundy", "khaki", "mustard",
+}
+
+
 def _states_differ(a: str, b: str) -> bool:
     """
-    Fuzzy state comparison, not exact-text equality. The same real-world
-    state described differently between two separate Gemini calls (e.g.
-    "yellow handles and silver metal blades" vs "silver metal blades with
-    yellow plastic handles" -- both plainly yellow) should NOT count as a
-    change just because of rewording or word-form drift (handles vs
-    handled). A genuine change (yellow -> green) still drops the overlap
-    score well below threshold, since the differing word is exactly the
-    one that matters. Threshold tuned against real test data.
+    Fuzzy state comparison, not exact-text equality -- with an explicit
+    color check that takes priority over general text similarity.
+
+    Two descriptions of the same object often share a lot of incidental
+    vocabulary ("silver metal blades", "handles") regardless of whether
+    the color actually changed, which can dilute a real color difference
+    below the general similarity threshold and cause a genuine error
+    (e.g. green handles -> yellow handles) to go undetected. Since color
+    is consistently the single most important, most-checked continuity
+    detail (per real testing), an explicit, disjoint color-word mismatch
+    is treated as a definite change regardless of how similar the rest of
+    the text is. Only once color doesn't settle the question does this
+    fall back to general fuzzy text similarity for other kinds of state
+    changes (open vs closed, material, etc.) -- e.g. same-color
+    descriptions reworded differently between two Gemini calls should
+    still NOT be flagged just because of rephrasing or word-form drift
+    (handles vs handled).
     """
     if a.lower() == b.lower():
         return False
+
     tokens_a, tokens_b = _tokenize_state(a), _tokenize_state(b)
     if not tokens_a or not tokens_b:
         return a.lower() != b.lower()
+
+    colors_a = tokens_a & COLOR_WORDS
+    colors_b = tokens_b & COLOR_WORDS
+    # Each side must have at least one color word the OTHER side lacks --
+    # not just "the color sets aren't identical". Two descriptions can
+    # share one color (e.g. both mention "silver" blades) while still
+    # genuinely conflicting on another (green handles vs yellow handles);
+    # a simple disjoint-check would wrongly treat the shared "silver" as
+    # proof nothing changed and miss the real handle-color conflict.
+    if (colors_a - colors_b) and (colors_b - colors_a):
+        return True  # a genuinely conflicting color is present on both sides
+
     return _soft_token_overlap(tokens_a, tokens_b) < 0.6
 
 
