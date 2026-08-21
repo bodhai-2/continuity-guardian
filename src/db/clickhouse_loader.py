@@ -154,25 +154,48 @@ def _tokenize_state(text: str) -> set[str]:
     return {w for w in re.findall(r"[a-z]+", text.lower()) if w not in STATE_STOPWORDS}
 
 
+def _soft_token_overlap(tokens_a: set[str], tokens_b: set[str], threshold: float = 0.75) -> float:
+    """
+    Pairs each token in tokens_a with its best character-level match in
+    tokens_b (via SequenceMatcher), counting a pair as matched only above
+    `threshold`. This is what makes "handles" correctly match "handled"
+    (word-form variants across separate Gemini calls) where a plain exact
+    token-set intersection would miss it and wrongly report a change.
+    """
+    used_b: set[str] = set()
+    matched = 0
+    for ta in tokens_a:
+        best_b, best_ratio = None, 0.0
+        for tb in tokens_b:
+            if tb in used_b:
+                continue
+            ratio = SequenceMatcher(None, ta, tb).ratio()
+            if ratio > best_ratio:
+                best_ratio, best_b = ratio, tb
+        if best_ratio >= threshold:
+            matched += 1
+            used_b.add(best_b)
+    denom = max(len(tokens_a), len(tokens_b))
+    return matched / denom if denom else 0.0
+
+
 def _states_differ(a: str, b: str) -> bool:
     """
-    Word-set similarity, not exact-text equality. The same real-world
-    state described in a different word order (e.g. "yellow handles and
-    silver metal blades" vs "silver metal blades with yellow plastic
-    handles" -- both plainly yellow) should NOT count as a change just
-    because Gemini phrased it differently between calls. A genuine color
-    or condition change (yellow -> green) still drops similarity well
-    below the threshold, since the differing word is exactly the one that
-    matters. Threshold tuned against real test data, not synthetic
-    examples -- see docs/BUILD_PLAN.md testing notes.
+    Fuzzy state comparison, not exact-text equality. The same real-world
+    state described differently between two separate Gemini calls (e.g.
+    "yellow handles and silver metal blades" vs "silver metal blades with
+    yellow plastic handles" -- both plainly yellow) should NOT count as a
+    change just because of rewording or word-form drift (handles vs
+    handled). A genuine change (yellow -> green) still drops the overlap
+    score well below threshold, since the differing word is exactly the
+    one that matters. Threshold tuned against real test data.
     """
     if a.lower() == b.lower():
         return False
     tokens_a, tokens_b = _tokenize_state(a), _tokenize_state(b)
     if not tokens_a or not tokens_b:
         return a.lower() != b.lower()
-    jaccard = len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
-    return jaccard < 0.6
+    return _soft_token_overlap(tokens_a, tokens_b) < 0.6
 
 
 def _normalize_label(label: str) -> str:
