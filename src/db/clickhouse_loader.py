@@ -144,6 +144,36 @@ def diff_takes_for_scene(client, scene_id: str) -> int:
 
 FILLER_WORDS = {"small", "medium", "large", "the", "a", "an", "object", "shape"}
 
+STATE_STOPWORDS = {
+    "and", "with", "the", "a", "an", "of", "in", "on", "at", "to", "is",
+    "are", "facing", "visible",
+}
+
+
+def _tokenize_state(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z]+", text.lower()) if w not in STATE_STOPWORDS}
+
+
+def _states_differ(a: str, b: str) -> bool:
+    """
+    Word-set similarity, not exact-text equality. The same real-world
+    state described in a different word order (e.g. "yellow handles and
+    silver metal blades" vs "silver metal blades with yellow plastic
+    handles" -- both plainly yellow) should NOT count as a change just
+    because Gemini phrased it differently between calls. A genuine color
+    or condition change (yellow -> green) still drops similarity well
+    below the threshold, since the differing word is exactly the one that
+    matters. Threshold tuned against real test data, not synthetic
+    examples -- see docs/BUILD_PLAN.md testing notes.
+    """
+    if a.lower() == b.lower():
+        return False
+    tokens_a, tokens_b = _tokenize_state(a), _tokenize_state(b)
+    if not tokens_a or not tokens_b:
+        return a.lower() != b.lower()
+    jaccard = len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+    return jaccard < 0.6
+
 
 def _normalize_label(label: str) -> str:
     """Strip only generic size/article noise so labels like 'small outlined
@@ -241,8 +271,8 @@ def diff_takes_for_scene(client, scene_id: str) -> int:
         for i in range(len(entries) - 1):
             take_a, label_a, pos_a, state_a = entries[i]
             take_b, label_b, pos_b, state_b = entries[i + 1]
-            pos_changed = pos_a.lower() != pos_b.lower()
-            state_changed = state_a.lower() != state_b.lower()
+            pos_changed = _states_differ(pos_a, pos_b)
+            state_changed = _states_differ(state_a, state_b)
             if pos_changed or state_changed:
                 severity = "high" if state_changed else "medium"
                 flag_text = (
