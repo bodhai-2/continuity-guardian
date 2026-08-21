@@ -46,7 +46,14 @@ what you see:
    and position as of the END of the take, right before the cut -- not
    partway through the motion. An on-screen, visible change within a
    single take is normal continuous action, not a continuity risk; only
-   an unexplained difference BETWEEN takes is.
+   an unexplained difference BETWEEN takes is. This matters most when an
+   object's appearance itself changes mid-take (e.g. swapped for a
+   different-colored version on camera): report ONLY the version visible
+   in the last few seconds before the take ends or before the object
+   becomes obscured (by a hand, a closing box, leaving frame, etc.) --
+   do not default to an earlier view just because it was clearer or more
+   prominent. Watch the entire clip through to its actual end before
+   deciding what to report.
 
 2. DESCRIBE POSITION RELATIVE TO THE BODY OR A FIXED LANDMARK, NOT RAW
    SCREEN DIRECTION, whenever possible. Prefer "in the actor's right
