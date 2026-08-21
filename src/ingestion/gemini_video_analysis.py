@@ -66,6 +66,15 @@ what you see:
    physical variation, not continuity errors, and should be left out of
    detected_objects entirely.
 
+4. ALWAYS STATE THE COLOR of any object or costume item when it's
+   visible, even if nothing else about it seems noteworthy. Color changes
+   (a prop swapped for a same-shaped one in a different color, a costume
+   item in the wrong shade) are some of the most common and most
+   noticeable real continuity errors, and must never be silently omitted
+   in favor of only describing shape, position, or orientation. If a
+   "state" or "costume_state" description doesn't mention color, treat
+   that as an incomplete description.
+
 Watch the provided clip and return STRICT JSON (no markdown, no commentary)
 matching this shape:
 
@@ -75,13 +84,13 @@ matching this shape:
     {
       "label": "e.g. coffee mug",
       "screen_position": "e.g. in the actor's left hand, held at chest height (body/landmark-relative, final state of the take)",
-      "state": "e.g. half full, handle facing camera (final state of the take)"
+      "state": "e.g. half full, yellow handle, handle facing camera (final state of the take -- always include color if visible)"
     }
   ],
   "actor_notes": [
     {
       "actor_description": "e.g. actor in blue jacket",
-      "costume_state": "e.g. jacket zipped, collar up (final state of the take)",
+      "costume_state": "e.g. jacket zipped, collar up, navy blue (final state of the take -- always include color if visible)",
       "pose_or_gesture": "e.g. right hand in pocket (final state of the take)"
     }
   ],
