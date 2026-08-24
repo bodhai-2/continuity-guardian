@@ -74,15 +74,15 @@ def get_prior_labels(client, scene_id: str) -> list[str]:
         return []
 
 
-def load_shot_json(client, json_path: Path, thumbnail_b64: str = "") -> str:
+def load_shot_json(client, json_path: Path, thumbnail_b64: str = "", video_b64: str = "", video_mime: str = "video/mp4") -> str:
     record = json.loads(json_path.read_text())
     scene_id = record["scene_id"]
     take_number = record["take_number"]
 
     client.insert(
         "shots",
-        [[scene_id, take_number, record["source_file"], record.get("shot_summary", ""), thumbnail_b64]],
-        column_names=["scene_id", "take_number", "source_file", "shot_summary", "thumbnail_b64"],
+        [[scene_id, take_number, record["source_file"], record.get("shot_summary", ""), thumbnail_b64, video_b64, video_mime]],
+        column_names=["scene_id", "take_number", "source_file", "shot_summary", "thumbnail_b64", "video_b64", "video_mime"],
     )
 
     detection_rows = []
