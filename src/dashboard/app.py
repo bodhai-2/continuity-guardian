@@ -15,6 +15,7 @@ Meant to be deployed on Cloud Run, Render, or Railway.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
@@ -24,7 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from src.agent.adk_agent import build_agent
@@ -92,6 +93,13 @@ async def upload_take(
     # instead of us guessing at fuzzy text matches after the fact.
     prior_labels = get_prior_labels(client, scene_id)
 
+    # Cap stored video size -- ClickHouse handles large strings fine, but
+    # on a free-tier deployment (limited RAM, limited storage) it's worth
+    # protecting against someone uploading a huge file and silently
+    # bloating the database. Above this, we keep the thumbnail (for the
+    # flags/scenes views) but skip storing the full video for playback.
+    MAX_STORED_VIDEO_BYTES = 25 * 1024 * 1024  # 25 MB
+
     with tempfile.TemporaryDirectory() as tmp:
         video_path = Path(tmp) / file.filename
         with video_path.open("wb") as f:
@@ -108,10 +116,16 @@ async def upload_take(
 
         thumbnail_b64 = extract_thumbnail_b64(video_path)
 
+        video_bytes = video_path.read_bytes()
+        video_b64 = ""
+        if len(video_bytes) <= MAX_STORED_VIDEO_BYTES:
+            video_b64 = base64.b64encode(video_bytes).decode("ascii")
+        video_mime = "video/mp4" if video_path.suffix.lower() == ".mp4" else "video/webm"
+
         json_path = Path(tmp) / "record.json"
         json_path.write_text(json.dumps(asdict(record)))
 
-        load_shot_json(client, json_path, thumbnail_b64=thumbnail_b64)
+        load_shot_json(client, json_path, thumbnail_b64=thumbnail_b64, video_b64=video_b64, video_mime=video_mime)
         flags_added = diff_takes_for_scene(client, scene_id)
 
     return {
@@ -119,6 +133,7 @@ async def upload_take(
         "take_number": take_number,
         "shot_summary": record.shot_summary,
         "new_continuity_flags": flags_added,
+        "video_stored": bool(video_b64),
     }
 
 
@@ -195,11 +210,13 @@ async def resolve_flag(flag_id: str):
 @app.get("/shots/{scene_id}")
 async def get_shots(scene_id: str):
     """Returns each take's summary and thumbnail for a scene, for the
-    side-by-side visual comparison strip in the dashboard."""
+    side-by-side visual comparison strip in the dashboard. Does NOT
+    include the full video (that would bloat this response) -- see
+    GET /shots/{scene_id}/video/{take_number} for actual playback."""
     client = get_client()
     rows = client.query(
         """
-        SELECT take_number, shot_summary, thumbnail_b64
+        SELECT take_number, shot_summary, thumbnail_b64, length(video_b64) > 0 AS has_video
         FROM shots
         WHERE scene_id = {scene_id:String}
         ORDER BY take_number ASC
@@ -210,10 +227,38 @@ async def get_shots(scene_id: str):
     return {
         "scene_id": scene_id,
         "shots": [
-            {"take_number": r[0], "shot_summary": r[1], "thumbnail_b64": r[2]}
+            {"take_number": r[0], "shot_summary": r[1], "thumbnail_b64": r[2], "has_video": bool(r[3])}
             for r in rows
         ],
     }
+
+
+@app.get("/shots/{scene_id}/video/{take_number}")
+async def get_shot_video(scene_id: str, take_number: int):
+    """
+    Streams the actual take footage back for in-browser playback. Video is
+    stored base64-encoded in ClickHouse (see /upload) -- fine for a
+    hackathon-scale number of demo takes, but worth knowing this isn't how
+    you'd architect video storage at real production scale (a dedicated
+    object store like GCS/S3 would be the real answer there).
+    """
+    client = get_client()
+    rows = client.query(
+        """
+        SELECT video_b64, video_mime
+        FROM shots
+        WHERE scene_id = {scene_id:String} AND take_number = {take_number:UInt16}
+        LIMIT 1
+        """,
+        parameters={"scene_id": scene_id, "take_number": take_number},
+    ).result_rows
+
+    if not rows or not rows[0][0]:
+        raise HTTPException(404, "No video stored for this take.")
+
+    video_b64, video_mime = rows[0]
+    video_bytes = base64.b64decode(video_b64)
+    return Response(content=video_bytes, media_type=video_mime or "video/mp4")
 
 
 _agent = None
