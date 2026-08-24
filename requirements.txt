@@ -7,7 +7,11 @@ clickhouse-connect>=0.7.0
 mcp-clickhouse>=0.1.0
 
 # MCP client (used by the ADK agent to talk to mcp-clickhouse)
-mcp>=1.2.0
+# Pinned to match google-adk's own declared requirement (mcp>=1.24,<2).
+# An unpinned install can pull mcp 2.0.0, which removes APIs this ADK
+# version imports and breaks the agent at startup -- verified against the
+# actually-installed ADK version, not guessed.
+mcp>=1.24.0,<2.0.0
 
 # Dashboard
 fastapi>=0.111.0
