@@ -188,28 +188,152 @@
 
   #thumb-strip {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     overflow-x: auto;
     margin-bottom: 14px;
+    padding-bottom: 4px;
   }
   .thumb-card {
     flex: 0 0 auto;
     text-align: center;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+  }
+  .thumb-card .thumb-frame {
+    position: relative;
+    width: 148px;
+    height: 84px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--panel-line);
+    transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+  .thumb-card:hover .thumb-frame {
+    border-color: var(--leader);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
   }
   .thumb-card img {
-    width: 120px;
-    height: 68px;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border: 1px solid var(--panel-line);
-    border-radius: 2px;
     display: block;
+  }
+  .thumb-card .play-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(11,13,15,0.28);
+    opacity: 0;
+    transition: opacity 160ms ease, background 160ms ease;
+  }
+  .thumb-card:hover .play-overlay {
+    opacity: 1;
+    background: rgba(11,13,15,0.45);
+  }
+  .thumb-card .play-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--leader);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: scale(0.85);
+    transition: transform 160ms ease;
+  }
+  .thumb-card:hover .play-icon { transform: scale(1); }
+  .thumb-card .play-icon svg { margin-left: 2px; }
+  .thumb-card.no-video .play-overlay { display: none; }
+  .thumb-card.no-video .thumb-frame { cursor: default; }
+  .thumb-card.no-video:hover .thumb-frame {
+    border-color: var(--panel-line);
+    transform: none;
+    box-shadow: none;
   }
   .thumb-card .thumb-label {
     font-size: 10px;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-top: 4px;
+    margin-top: 6px;
+  }
+
+  /* --- Video modal --- */
+  #video-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(6,7,8,0.82);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 180ms ease;
+  }
+  #video-modal-backdrop.open {
+    display: flex;
+    opacity: 1;
+  }
+  #video-modal {
+    background: var(--panel);
+    border: 1px solid var(--leader);
+    border-radius: 4px;
+    width: min(720px, 92vw);
+    padding: 18px;
+    transform: scale(0.96) translateY(6px);
+    transition: transform 180ms ease;
+  }
+  #video-modal-backdrop.open #video-modal {
+    transform: scale(1) translateY(0);
+  }
+  #video-modal .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  #video-modal .modal-title {
+    font-family: var(--mono);
+    color: var(--leader);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  #video-modal .modal-close {
+    background: transparent;
+    border: 1px solid var(--panel-line);
+    color: var(--text-dim);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: border-color 140ms ease, color 140ms ease;
+  }
+  #video-modal .modal-close:hover {
+    border-color: var(--high);
+    color: var(--high);
+  }
+  #video-modal video {
+    width: 100%;
+    max-height: 60vh;
+    border-radius: 2px;
+    background: #000;
+    display: block;
+  }
+  #video-modal .modal-summary {
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height: 1.5;
   }
 
   .flag.resolved { opacity: 0.45; }
@@ -366,6 +490,17 @@
 
 <footer>Team Vidyut — built for the Google Cloud Agentic Cinema Hackathon — ClickHouse track</footer>
 
+<div id="video-modal-backdrop" onclick="if(event.target===this) closeVideoModal();">
+  <div id="video-modal">
+    <div class="modal-head">
+      <span class="modal-title" id="video-modal-title">SC01 · TAKE 1</span>
+      <button class="modal-close" onclick="closeVideoModal()" aria-label="Close">✕</button>
+    </div>
+    <video id="video-modal-player" controls autoplay muted playsinline></video>
+    <div class="modal-summary" id="video-modal-summary"></div>
+  </div>
+</div>
+
 <script>
 // Access key persists across page reloads via localStorage so you don't
 // have to retype it every time -- fine for a low-stakes shared secret.
@@ -449,9 +584,12 @@ async function uploadTake() {
   }
 }
 
+let currentSceneId = '';
+
 async function loadThumbnails(sceneId) {
   const stripEl = document.getElementById('thumb-strip');
   stripEl.innerHTML = '';
+  currentSceneId = sceneId;
   try {
     const res = await fetch(`/shots/${encodeURIComponent(sceneId)}`);
     if (!res.ok) return;
@@ -459,15 +597,50 @@ async function loadThumbnails(sceneId) {
     stripEl.innerHTML = (data.shots || [])
       .filter(s => s.thumbnail_b64)
       .map(s => `
-        <div class="thumb-card">
-          <img src="data:image/jpeg;base64,${s.thumbnail_b64}" alt="Take ${s.take_number}">
+        <button class="thumb-card ${s.has_video ? '' : 'no-video'}"
+                onclick="${s.has_video ? `openVideoModal('${sceneId}', ${s.take_number}, ${JSON.stringify(s.shot_summary || '')})` : ''}"
+                title="${s.has_video ? 'Click to play this take' : 'No video stored for this take'}">
+          <div class="thumb-frame">
+            <img src="data:image/jpeg;base64,${s.thumbnail_b64}" alt="Take ${s.take_number}">
+            <div class="play-overlay">
+              <div class="play-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#14120a"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+            </div>
+          </div>
           <div class="thumb-label">Take ${s.take_number}</div>
-        </div>
+        </button>
       `).join('');
   } catch (err) {
     // Thumbnails are a nice-to-have -- fail silently rather than blocking the flags view.
   }
 }
+
+function openVideoModal(sceneId, takeNumber, summary) {
+  const backdrop = document.getElementById('video-modal-backdrop');
+  const player = document.getElementById('video-modal-player');
+  const title = document.getElementById('video-modal-title');
+  const summaryEl = document.getElementById('video-modal-summary');
+
+  title.textContent = `${sceneId} · TAKE ${takeNumber}`;
+  summaryEl.textContent = summary || '';
+  player.src = `/shots/${encodeURIComponent(sceneId)}/video/${takeNumber}`;
+  backdrop.classList.add('open');
+  player.play().catch(() => {});  // autoplay can be blocked -- controls let the user press play manually
+}
+
+function closeVideoModal() {
+  const backdrop = document.getElementById('video-modal-backdrop');
+  const player = document.getElementById('video-modal-player');
+  backdrop.classList.remove('open');
+  player.pause();
+  player.removeAttribute('src');
+  player.load();  // fully releases the video, stops any background audio/decoding
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeVideoModal();
+});
 
 async function loadFlags() {
   const sceneId = document.getElementById('flags-scene-id').value.trim();
