@@ -586,6 +586,21 @@ async function uploadTake() {
 
 let currentSceneId = '';
 
+function escapeHtml(str) {
+  // Escaping via a div's textContent/innerHTML alone is NOT enough here:
+  // browsers correctly escape <, >, and & that way, but do NOT escape "
+  // during innerHTML serialization (a bare quote is safe in text content,
+  // just not inside an attribute value like data-summary="..."). Explicit
+  // replacement covers every character these values actually get embedded
+  // next to.
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function loadThumbnails(sceneId) {
   const stripEl = document.getElementById('thumb-strip');
   stripEl.innerHTML = '';
@@ -598,7 +613,10 @@ async function loadThumbnails(sceneId) {
       .filter(s => s.thumbnail_b64)
       .map(s => `
         <button class="thumb-card ${s.has_video ? '' : 'no-video'}"
-                onclick="${s.has_video ? `openVideoModal('${sceneId}', ${s.take_number}, ${JSON.stringify(s.shot_summary || '')})` : ''}"
+                data-scene="${escapeHtml(sceneId)}"
+                data-take="${s.take_number}"
+                data-summary="${escapeHtml(s.shot_summary || '')}"
+                data-has-video="${s.has_video ? '1' : ''}"
                 title="${s.has_video ? 'Click to play this take' : 'No video stored for this take'}">
           <div class="thumb-frame">
             <img src="data:image/jpeg;base64,${s.thumbnail_b64}" alt="Take ${s.take_number}">
@@ -611,6 +629,18 @@ async function loadThumbnails(sceneId) {
           <div class="thumb-label">Take ${s.take_number}</div>
         </button>
       `).join('');
+
+    // Attach click handlers via JS rather than building an inline onclick
+    // string: embedding free-text (the shot summary) inside an HTML
+    // attribute delimited by the same quote character it can itself
+    // contain silently corrupts the markup -- this is exactly what broke
+    // the click handler before. data-* attributes are HTML-escaped by
+    // the browser automatically, so this is the robust way to do it.
+    stripEl.querySelectorAll('.thumb-card[data-has-video="1"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openVideoModal(btn.dataset.scene, Number(btn.dataset.take), btn.dataset.summary);
+      });
+    });
   } catch (err) {
     // Thumbnails are a nice-to-have -- fail silently rather than blocking the flags view.
   }
