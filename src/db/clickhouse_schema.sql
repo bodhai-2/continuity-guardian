@@ -12,13 +12,17 @@ CREATE TABLE IF NOT EXISTS continuity_guardian.shots
     source_file String,
     shot_summary String,
     thumbnail_b64 String DEFAULT '',
+    video_b64 String DEFAULT '',
+    video_mime String DEFAULT 'video/mp4',
     ingested_at DateTime DEFAULT now()
 )
 ENGINE = MergeTree
 ORDER BY (scene_id, take_number);
 
--- Safe to re-run against a database created before thumbnails existed.
+-- Safe to re-run against a database created before thumbnails/video existed.
 ALTER TABLE continuity_guardian.shots ADD COLUMN IF NOT EXISTS thumbnail_b64 String DEFAULT '';
+ALTER TABLE continuity_guardian.shots ADD COLUMN IF NOT EXISTS video_b64 String DEFAULT '';
+ALTER TABLE continuity_guardian.shots ADD COLUMN IF NOT EXISTS video_mime String DEFAULT 'video/mp4';
 
 CREATE TABLE IF NOT EXISTS continuity_guardian.detections
 (
